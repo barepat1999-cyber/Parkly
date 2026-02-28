@@ -1,0 +1,31 @@
+diff --git a/node_modules/react-native-maps/ios/AirMaps/AIRMap.m b/node_modules/react-native-maps/ios/AirMaps/AIRMap.m
+--- a/node_modules/react-native-maps/ios/AirMaps/AIRMap.m
++++ b/node_modules/react-native-maps/ios/AirMaps/AIRMap.m
+@@ -90,6 +90,27 @@
+     return self;
+ }
+ 
++#pragma mark - satellite.styl workaround (iOS 16+)
++// Use MKImageryMapConfiguration instead of mapType=.satellite to avoid MapKit's
++// internal "Failed to locate resource named 'satellite.styl'" console spam.
++- (void)setMapType:(MKMapType)mapType {
++    if (@available(iOS 16.0, *)) {
++        if (mapType == MKMapTypeSatellite || mapType == MKMapTypeSatelliteFlyover) {
++            self.preferredConfiguration = [[MKImageryMapConfiguration alloc] init];
++            return;
++        }
++        if (mapType == MKMapTypeHybrid || mapType == MKMapTypeHybridFlyover) {
++            self.preferredConfiguration = [[MKImageryMapConfiguration alloc] init];
++            return;
++        }
++        if (mapType == MKMapTypeStandard || mapType == MKMapTypeMutedStandard) {
++            self.preferredConfiguration = [[MKStandardMapConfiguration alloc] init];
++            return;
++        }
++    }
++    [super setMapType:mapType];
++}
++
+ -(void)addSubview:(UIView *)view {
+     if([view isKindOfClass:[AIRMapMarker class]]) {
+         [self addAnnotation:(id <MKAnnotation>)view];
