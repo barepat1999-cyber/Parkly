@@ -175,8 +175,9 @@ class ReportStoreClass {
     location: { latitude: number; longitude: number; accuracy?: number }
   ): Promise<void> {
     const fireStatus = status === 'available' ? 'free' : 'occupied';
+    const tempId = generateId();
     const report: ParkingReport = {
-      id: generateId(),
+      id: tempId,
       createdAt: Date.now(),
       latitude: location.latitude,
       longitude: location.longitude,
@@ -185,10 +186,16 @@ class ReportStoreClass {
       userId: this.currentUserId ?? undefined,
     };
 
+    // Optimistic: show report immediately
+    report.id = `pending-${tempId}`;
+    this.pendingReports = [report, ...this.pendingReports];
+    await savePending(this.pendingReports);
+    this.emit();
+
     try {
       const { createReport, ensureAuth } = await import('../services/reportService');
-      const { hasValidConfig } = await import('../config/firebase');
-      if (!hasValidConfig) throw new Error('Firebase not configured');
+      const { canUseFirestore } = await import('../config/firebase');
+      if (!canUseFirestore()) throw new Error('Firebase not configured');
       const uid = await ensureAuth();
       this.setCurrentUserId(uid);
       const docId = await createReport({
@@ -196,16 +203,16 @@ class ReportStoreClass {
         lon: location.longitude,
         status: fireStatus,
       });
+      // Replace pending with confirmed
+      this.pendingReports = this.pendingReports.filter((r) => r.id !== report.id);
       report.id = docId;
       report.userId = uid;
-      this.reportsRemote = [report, ...this.reportsRemote.filter((r) => r.id !== docId)];
-      this.emit();
-    } catch (e) {
-      if (__DEV__) console.warn('[ReportStore] createReport failed (offline?), adding to pending:', e);
-      report.id = `pending-${report.id}`;
-      this.pendingReports = [report, ...this.pendingReports];
+      this.reportsRemote = [report, ...this.reportsRemote];
       await savePending(this.pendingReports);
       this.emit();
+    } catch (e) {
+      if (__DEV__) console.warn('[ReportStore] createReport failed (offline?), keeping in pending:', e);
+      // Report stays in pendingReports (already added above)
     }
   }
 

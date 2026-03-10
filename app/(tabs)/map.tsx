@@ -14,12 +14,15 @@ import {
   Keyboard,
   Alert,
   AppState,
+  Button,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 import MapView, { Marker, Circle, Region } from 'react-native-maps';
+import { httpsCallable } from 'firebase/functions';
 import { useReportStore } from '../../src/store/ReportStoreContext';
 import { ParkingReport, formatTime, formatDateLabel } from '../../src/types/parking';
+import { functions } from '../../src/config/firebase';
 import { getCurrentLocation } from '../../src/utils/location';
 import { distanceMeters, formatDistance } from '../../src/utils/geo';
 import { SEED_AREAS } from '../../src/data/seedAreas';
@@ -27,6 +30,7 @@ import StripedParkingArea from '../../src/components/StripedParkingArea';
 import { getConfidenceCellsInRegion } from '../../src/services/confidenceGrid';
 import { groupReportsBySpot, type SpotGroup } from '../../src/utils/spotGrouping';
 import type { TimeFilterValue } from '../../src/store/ReportStoreContext';
+import type { Zone } from '../../src/types/zone';
 
 const COPENHAGEN_CENTER: Region = {
   latitude: 55.6761,
@@ -44,6 +48,9 @@ const FILTER_OPTIONS: { value: TimeFilterValue; label: string }[] = [
 
 /** Map display only: reports older than this are hidden (markers, confidence, counts). History unchanged. */
 const reportValidityMinutes = 0;
+
+/** Radius in meters for getZonesNear. Reasonable for "nearby" parking. */
+const ZONES_FETCH_RADIUS_M = 1500;
 
 function roundCoord(n: number): number {
   return Math.round(n * 10000) / 10000;
@@ -133,15 +140,57 @@ export default function MapScreen() {
   const [destination, setDestination] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [mapRefreshAt, setMapRefreshAt] = useState(() => Date.now());
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [zonesLoading, setZonesLoading] = useState(false);
+  const zonesFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleRegionChangeComplete = useCallback((r: Region) => {
-    setRegion(r);
-    regionRef.current = r;
-    mapCenterReady.current = true;
+  const fetchZonesNear = useCallback(async (centerLat: number, centerLng: number) => {
+    if (!functions) return;
+    setZonesLoading(true);
+    try {
+      const callable = httpsCallable(functions, 'getZonesNear');
+      const res = await callable({
+        lat: centerLat,
+        lng: centerLng,
+        radiusMeters: ZONES_FETCH_RADIUS_M,
+      });
+      const data = res.data as { zones: Zone[] };
+      const list = data?.zones ?? [];
+      setZones(list);
+      if (__DEV__) console.log('[Map] getZonesNear:', list.length, 'zones at', centerLat.toFixed(4), centerLng.toFixed(4));
+    } catch (error) {
+      if (__DEV__) console.error('[Map] getZonesNear error:', error);
+      setZones([]);
+    } finally {
+      setZonesLoading(false);
+    }
   }, []);
+
+  const handleRegionChangeComplete = useCallback(
+    (r: Region) => {
+      setRegion(r);
+      regionRef.current = r;
+      mapCenterReady.current = true;
+      // Debounce zone fetch to avoid rapid calls while panning
+      if (zonesFetchTimeoutRef.current) clearTimeout(zonesFetchTimeoutRef.current);
+      zonesFetchTimeoutRef.current = setTimeout(() => {
+        zonesFetchTimeoutRef.current = null;
+        const centerLat = r.latitude;
+        const centerLng = r.longitude;
+        fetchZonesNear(centerLat, centerLng);
+      }, 300);
+    },
+    [fetchZonesNear]
+  );
 
   useEffect(() => {
     getCurrentLocation().then(setUserLocation);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (zonesFetchTimeoutRef.current) clearTimeout(zonesFetchTimeoutRef.current);
+    };
   }, []);
 
   // Refresh map display when app returns to foreground
@@ -188,6 +237,8 @@ export default function MapScreen() {
       setUserLocation(coords);
     }
     await addReport(status, coords);
+    // Refetch zones so new zone from onReportCreated appears
+    fetchZonesNear(region.latitude, region.longitude);
   };
 
   const handleMarkerPress = (group: SpotGroup) => {
@@ -369,6 +420,16 @@ export default function MapScreen() {
             strokeColor="transparent"
           />
         ))}
+        {zones.map((zone) => (
+          <Circle
+            key={zone.id}
+            center={{ latitude: zone.centerLat, longitude: zone.centerLng }}
+            radius={80}
+            fillColor="rgba(33, 150, 243, 0.2)"
+            strokeColor="rgba(33, 150, 243, 0.5)"
+            strokeWidth={1}
+          />
+        ))}
         {spotGroups.map((group) => (
           <SpotMarker
             key={group.key}
@@ -433,6 +494,19 @@ export default function MapScreen() {
         >
           <Text style={styles.reportButtonText}>Optaget</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Debug overlay: zones count, center, nearest free */}
+      <View style={styles.zonesDebugOverlay}>
+        <Text style={styles.zonesDebugOverlayText}>
+          Zones: {zonesLoading ? '…' : zones.length}
+        </Text>
+        <Text style={styles.zonesDebugOverlayText}>
+          Center: {region.latitude.toFixed(4)}, {region.longitude.toFixed(4)}
+        </Text>
+        <Text style={styles.zonesDebugOverlayText}>
+          Nearest free: {nearestDistanceMeters != null ? formatDistance(nearestDistanceMeters) : '—'}
+        </Text>
       </View>
 
       <Modal
@@ -655,6 +729,16 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   filterButtonText: { fontSize: 14, fontWeight: '600', color: '#333' },
+  zonesDebugOverlay: {
+    position: 'absolute',
+    bottom: 170,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  zonesDebugOverlayText: { color: '#fff', fontSize: 11 },
   filterOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.3)',

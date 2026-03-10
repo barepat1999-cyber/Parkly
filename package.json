@@ -10,7 +10,9 @@
     "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "emulators:start": "firebase emulators:start --only auth,firestore,functions --import=./emulator-data --export-on-exit=./emulator-data",
+    "emulators:clear": "rm -rf emulator-data && mkdir -p emulator-data"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.21.0",

@@ -11,7 +11,7 @@ import {
   toParkingReport,
   ensureAuth,
 } from '../services/reportService';
-import { hasValidConfig } from '../config/firebase';
+import { hasValidConfig, canUseFirestore } from '../config/firebase';
 
 export type ReportByDay = { dateKey: string; label: string; reports: ParkingReport[] };
 
@@ -55,7 +55,7 @@ export function ReportStoreProvider({ children }: { children: React.ReactNode })
       setReports(ReportStore.getReports());
       setIsReady(true);
 
-      if (hasValidConfig) {
+      if (canUseFirestore()) {
         try {
           const uid = await ensureAuth();
           ReportStore.setCurrentUserId(uid);
@@ -74,7 +74,7 @@ export function ReportStoreProvider({ children }: { children: React.ReactNode })
   }, []);
 
   useEffect(() => {
-    if (!hasValidConfig) return;
+    if (!canUseFirestore()) return;
     const unsub = subscribeReports(
       (firestoreReports) => {
         const parkingReports = firestoreReports.map(toParkingReport);

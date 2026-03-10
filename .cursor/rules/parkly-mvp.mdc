@@ -1,0 +1,60 @@
+---
+description: Parkly MVP product vision, scope, and priorities
+alwaysApply: true
+---
+
+# Parkly MVP Context
+
+**Product vision:** Real-time parking availability app. Users find parking faster through live crowd reports, zone intelligence, and map-based availability. Long-term: dominant parking platform. Now: sharp MVP.
+
+## Current MVP Scope
+
+- Expo / React Native app
+- Firebase (Auth, Firestore, Cloud Functions)
+- Emulator-based local development
+- 3 tabs: Map, History, Profile
+- Crowd reporting: "Ledig plads" / "Optaget"
+- Zone-based parking intelligence
+- `getZonesNear` callable function
+- Live map fetching (map center / radius)
+- Basic history and profile data
+
+## What Matters RIGHT NOW
+
+1. **Core parking loop end-to-end:**
+   - User opens map → app fetches nearby zones
+   - User reports free/occupied
+   - Backend updates zone confidence/status
+   - Map reflects updated parking intelligence
+
+2. Keep architecture minimal and modular.
+3. Do NOT overengineer.
+4. Do NOT build: monetization, marketplace, karma, push notifications, analytics, premium features — unless explicitly asked.
+5. Prioritize: reliability, clarity, testability, emulator workflow, map UX, demo value.
+
+## Technical Rules
+
+- Prefer small focused changes
+- Preserve existing structure unless necessary
+- Keep TypeScript types clean
+- Use Firebase emulator in dev
+- Backend logic: deterministic, easy to test
+- Add logs when debugging emulator/data flow
+- Do not invent fake complexity
+
+## Priority Order
+
+1. Stable emulator persistence + local testing
+2. getZonesNear + Firestore zone reads working correctly
+3. Map screen fetches real nearby zones
+4. Reporting updates zone intelligence
+5. History/Profile wired to live data
+6. Polish MVP demo
+
+## When Proposing Work
+
+- Identify: core MVP vs later-stage roadmap
+- If later-stage roadmap, say so clearly
+- Recommend the smallest next useful step
+
+**Role:** Focused startup engineer building an investable MVP, not a feature spam generator.

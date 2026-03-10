@@ -1,4 +1,5 @@
 node_modules/
+functions/lib/
 .expo/
 .expo-shared/
 dist/
@@ -13,3 +14,7 @@ web-build/
 .env
 .env.local
 .DS_Store
+emulator-data/*
+!emulator-data/.gitkeep
+firebase-debug.log
+firestore-debug.log

@@ -1,0 +1,3 @@
+curl -i -X POST "http://127.0.0.1:5001/demo-project/us-central1/getZonesNear" \
+-H "Content-Type: application/json" \
+-d '{"data":{"lat":55.6761,"lng":12.5683,"radiusMeters":500}}'

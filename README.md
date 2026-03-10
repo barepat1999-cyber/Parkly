@@ -46,6 +46,56 @@ cp .env.example .env
 - Deploy `firestore.rules` til Firebase (Firebase Console → Firestore → Rules)
 - Ved første kørsel kan Firestore bede om et composite index for `reports`: `createdAt` (asc) + `createdAt` (desc). Følg linket i fejlbeskeden for at oprette det.
 
+### Firebase Cloud Functions (Parking Intelligence Layer v1)
+
+Functions ligger i `functions/` og kører som backend-triggers og callable functions.
+
+**Kør emulatorer (Firestore + Functions) med persistence:**
+```bash
+npm run emulators:start
+```
+Firestore-data gemmes i `./emulator-data` og genindlæses ved næste start. Data overlever genstarter.
+
+- Firestore: `127.0.0.1:8080`
+- Functions: `127.0.0.1:5001`
+- Emulator UI: `http://127.0.0.1:4000`
+
+Ryd eksisterende data: `npm run emulators:clear`
+
+**Test getZonesNear via curl:**
+```bash
+curl -X POST 'http://127.0.0.1:5001/demo-project/us-central1/getZonesNear' \
+  -H 'Content-Type: application/json' \
+  -d '{"data":{"lat":55.6761,"lng":12.5683,"radiusMeters":500}}'
+```
+(Erstat `demo-project` med dit project ID fra `.firebaserc`.)
+
+**Test via app:**
+1. Start emulatorer: `npm run emulators:start`
+2. Start app: `npm start` eller `npm run ios`
+3. Åbn Map-fanen, tryk **"Test getZonesNear"**
+4. Tjek Alert + overlay "Zones: X" + Metro/emulator logs
+
+**Deploy til Firebase:**
+```bash
+firebase deploy --only functions
+```
+
+Sørg for at `.firebaserc` peger på dit Firebase-projekt (opdater `default` med dit project ID).
+
+### App + Emulator (DEV)
+
+I `__DEV__` forbinder appen automatisk til Firestore og Functions emulator på `127.0.0.1` (iOS Simulator).
+
+**Fysisk enhed:** Sæt `EXPO_PUBLIC_EMULATOR_HOST` i `.env` til din Mac's lokale IP:
+
+```bash
+# .env (kun på fysisk enhed – iOS Simulator bruger 127.0.0.1)
+EXPO_PUBLIC_EMULATOR_HOST=192.168.1.100
+```
+
+Find din IP med `ifconfig | grep "inet "` (Wi‑Fi).
+
 ### 3. Opsæt Google Maps API
 
 1. Opret et projekt i [Google Cloud Console](https://console.cloud.google.com/)

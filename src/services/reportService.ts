@@ -9,7 +9,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { auth, db, hasValidConfig, signInAnonymously } from '../config/firebase';
+import { auth, db, canUseFirestore, signInAnonymously } from '../config/firebase';
 
 export type FirestoreReport = {
   id: string;
@@ -52,7 +52,7 @@ export async function createReport(params: {
   lon: number;
   status: 'free' | 'occupied';
 }): Promise<string> {
-  if (!db || !hasValidConfig) throw new Error('Firestore not initialized');
+  if (!db || !canUseFirestore()) throw new Error('Firestore not initialized');
   const userId = await ensureAuth();
   const dayKey = dayKeyFromDate(new Date());
   const docRef = await addDoc(collection(db, 'reports'), {
@@ -84,7 +84,7 @@ export function subscribeReports(
   onUpdate: (reports: FirestoreReport[]) => void,
   options?: { sinceMinutes?: number }
 ): () => void {
-  if (!db || !hasValidConfig) {
+  if (!db || !canUseFirestore()) {
     onUpdate([]);
     return () => {};
   }
