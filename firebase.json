@@ -1,6 +1,7 @@
 {
   "firestore": {
-    "rules": "firestore.rules"
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
   "functions": [
     {
@@ -19,10 +20,10 @@
     }
   ],
   "emulators": {
-    "auth": { "port": 9099 },
-    "firestore": { "port": 8080 },
-    "functions": { "port": 5001 },
-    "ui": { "enabled": true, "port": 4000 },
-    "logging": { "port": 4500 }
+    "auth": { "port": 9199 },
+    "firestore": { "port": 8082 },
+    "functions": { "port": 5002 },
+    "ui": { "enabled": true, "port": 4002 },
+    "logging": { "port": 4501 }
   }
 }

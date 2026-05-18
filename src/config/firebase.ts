@@ -39,15 +39,19 @@ function initFirebase(): void {
     functions = getFunctions(app, 'us-central1');
 
     if (typeof __DEV__ !== 'undefined' && __DEV__ && !(global as { __firebaseEmulatorsConnected?: boolean }).__firebaseEmulatorsConnected) {
-      connectAuthEmulator(auth, 'http://127.0.0.1:9099');
-      connectFirestoreEmulator(db, '127.0.0.1', 8080);
-      connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+      connectAuthEmulator(auth, 'http://127.0.0.1:9199');
+      connectFirestoreEmulator(db, '127.0.0.1', 8082);
+      connectFunctionsEmulator(functions, '127.0.0.1', 5002);
       (global as { __firebaseEmulatorsConnected?: boolean }).__firebaseEmulatorsConnected = true;
-      console.log('[Firebase] Using emulators: Auth 9099, Firestore 8080, Functions 5001');
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.debug('[Firebase] Using emulators: Auth 9199, Firestore 8082, Functions 5002');
+      }
     }
   } catch (error) {
     initError = error;
-    if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('[Firebase] init failed:', error);
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.debug('[Firebase] init failed:', error);
+    }
   }
 }
 

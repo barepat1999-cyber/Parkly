@@ -7,11 +7,26 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useReportStore } from '../../src/store/ReportStoreContext';
+import { ONBOARDING_COMPLETED_KEY, PROFILE_COMPLETED_KEY } from '../../src/constants/onboarding';
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const { dayStreak, totalReports, clearAll } = useReportStore();
   const [loading, setLoading] = useState(false);
+
+  const handleResetOnboarding = async () => {
+    try {
+      await AsyncStorage.removeItem(ONBOARDING_COMPLETED_KEY);
+      await AsyncStorage.removeItem(PROFILE_COMPLETED_KEY);
+      router.replace('/');
+    } catch (e) {
+      if (__DEV__) console.debug('[Profile] reset onboarding failed:', e);
+      Alert.alert('Error', 'Could not reset onboarding.');
+    }
+  };
 
   const handleReset = () => {
     Alert.alert(
@@ -24,8 +39,14 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             setLoading(true);
-            await clearAll();
-            setLoading(false);
+            try {
+              await clearAll();
+            } catch (e) {
+              if (__DEV__) console.warn('[Profile] clearAll failed:', e);
+              Alert.alert('Fejl', 'Kunne ikke slette – prøv igen.');
+            } finally {
+              setLoading(false);
+            }
           },
         },
       ]
@@ -58,6 +79,17 @@ export default function ProfileScreen() {
         >
           <Text style={styles.resetButtonText}>Reset local data</Text>
         </TouchableOpacity>
+
+        {__DEV__ && (
+          <TouchableOpacity
+            style={[styles.resetButton, { marginTop: 8 }]}
+            onPress={handleResetOnboarding}
+          >
+            <Text style={[styles.resetButtonText, { color: '#14B8A6' }]}>
+              Reset onboarding
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </ScrollView>
   );

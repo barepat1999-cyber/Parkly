@@ -17,6 +17,7 @@ export default function TabLayout() {
         name="map"
         options={{
           title: 'Map',
+          headerShown: false,
           tabBarIcon: () => null,
         }}
       />

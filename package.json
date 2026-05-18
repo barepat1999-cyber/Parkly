@@ -4,6 +4,8 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
+    "dev": "expo start --clear",
+    "prep:xcode": "bash scripts/prep-xcode.sh",
     "start:clear": "expo start --clear",
     "ios": "expo run:ios",
     "android": "expo run:android",
@@ -11,6 +13,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "postinstall": "patch-package",
+    "fetch:copenhagen-parking": "node scripts/fetch-copenhagen-osm-parking.mjs",
+    "fetch:fb-parking": "node scripts/fetch-frederiksberg-parking-osm.mjs",
     "emulators:start": "firebase emulators:start --only auth,firestore,functions --import=./emulator-data --export-on-exit=./emulator-data",
     "emulators:clear": "rm -rf emulator-data && mkdir -p emulator-data"
   },
@@ -25,8 +29,10 @@
     "expo-font": "~11.10.3",
     "expo-linking": "~6.2.2",
     "expo-location": "~16.5.5",
+    "expo-notifications": "~0.27.8",
     "expo-router": "~3.4.10",
     "expo-status-bar": "~1.11.1",
+    "expo-task-manager": "~11.7.3",
     "firebase": "^10.7.1",
     "react": "18.2.0",
     "react-native": "^0.73.6",

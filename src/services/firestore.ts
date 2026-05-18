@@ -56,7 +56,9 @@ export async function getSpotsInRadius(
   radiusKm: number = 5
 ): Promise<Spot[]> {
   if (!db) {
-    console.warn('Firestore is not initialized. Returning empty array.');
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.debug('Firestore is not initialized. Returning empty array.');
+    }
     return [];
   }
   // Note: Firestore doesn't support geo queries natively
@@ -149,7 +151,9 @@ export async function getUserReports(
   limitCount: number = 30
 ): Promise<Report[]> {
   if (!db) {
-    console.warn('Firestore is not initialized. Returning empty array.');
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.debug('Firestore is not initialized. Returning empty array.');
+    }
     return [];
   }
   const q = query(
@@ -177,7 +181,9 @@ export async function getUserReports(
 // User operations
 export async function getUser(userId: string): Promise<User | null> {
   if (!db) {
-    console.warn('Firestore is not initialized. Returning null.');
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.debug('Firestore is not initialized. Returning null.');
+    }
     return null;
   }
   const userDoc = await getDoc(doc(db, 'users', userId));
@@ -195,7 +201,9 @@ export async function getUser(userId: string): Promise<User | null> {
 
 export async function createOrUpdateUser(userId: string): Promise<void> {
   if (!db) {
-    console.warn('Firestore is not initialized. Skipping user creation.');
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.debug('Firestore is not initialized. Skipping user creation.');
+    }
     return;
   }
   const userRef = doc(db, 'users', userId);
@@ -216,7 +224,9 @@ export async function createOrUpdateUser(userId: string): Promise<void> {
 
 export async function incrementUserKarma(userId: string, amount: number = 1): Promise<void> {
   if (!db) {
-    console.warn('Firestore is not initialized. Skipping karma increment.');
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.debug('Firestore is not initialized. Skipping karma increment.');
+    }
     return;
   }
   const userRef = doc(db, 'users', userId);

@@ -1,0 +1,22 @@
+diff --git a/node_modules/react-native/Libraries/ReactNative/AppContainer.js b/node_modules/react-native/Libraries/ReactNative/AppContainer.js
+index a17b364..47e2971 100644
+--- a/node_modules/react-native/Libraries/ReactNative/AppContainer.js
++++ b/node_modules/react-native/Libraries/ReactNative/AppContainer.js
+@@ -52,14 +52,9 @@ class AppContainer extends React.Component<Props, State> {
+   static getDerivedStateFromError: any = undefined;
+ 
+   mountReactDevToolsOverlays(): void {
+-    const DevtoolsOverlay = require('../Inspector/DevtoolsOverlay').default;
+-    const devtoolsOverlay = <DevtoolsOverlay inspectedView={this._mainRef} />;
+-
+-    const TraceUpdateOverlay =
+-      require('../Components/TraceUpdateOverlay/TraceUpdateOverlay').default;
+-    const traceUpdateOverlay = <TraceUpdateOverlay />;
+-
+-    this.setState({devtoolsOverlay, traceUpdateOverlay});
++    // Parkly: skip DevtoolsOverlay (Inspect / Perf / Network / Touchables strip) in development
++    // so the app looks like a normal product. Revert this hunk if you need React DevTools overlays.
++    return;
+   }
+ 
+   componentDidMount(): void {

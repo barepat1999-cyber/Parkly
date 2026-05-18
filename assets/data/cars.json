@@ -1,0 +1,7 @@
+{
+  "Mercedes": ["A-Class", "C-Class", "E-Class", "S-Class", "GLA", "GLC", "GLE", "GLS", "EQE", "EQS"],
+  "BMW": ["1 Series", "3 Series", "5 Series", "7 Series", "X1", "X3", "X5"],
+  "Audi": ["A3", "A4", "A6", "Q3", "Q5", "Q7"],
+  "Tesla": ["Model 3", "Model Y", "Model S", "Model X"],
+  "Volkswagen": ["Golf", "Polo", "Passat", "Tiguan"]
+}

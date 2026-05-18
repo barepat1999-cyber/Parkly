@@ -22,6 +22,9 @@ export async function signInAnonymouslyAuth(): Promise<FirebaseUser> {
 }
 
 export async function signInWithEmail(email: string, password: string): Promise<FirebaseUser> {
+  if (!auth) {
+    throw new Error('Firebase Auth is not initialized. Please check your Firebase configuration.');
+  }
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
   
@@ -31,6 +34,9 @@ export async function signInWithEmail(email: string, password: string): Promise<
 }
 
 export async function signUpWithEmail(email: string, password: string): Promise<FirebaseUser> {
+  if (!auth) {
+    throw new Error('Firebase Auth is not initialized. Please check your Firebase configuration.');
+  }
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
   
@@ -45,8 +51,10 @@ export function getCurrentUser(): FirebaseUser | null {
 
 export function onAuthChange(callback: (user: FirebaseUser | null) => void) {
   if (!auth) {
-    console.warn('Firebase Auth is not initialized');
-    return () => {}; // Return empty unsubscribe function
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.debug('Firebase Auth is not initialized');
+    }
+    return () => {};
   }
   return onAuthStateChanged(auth, callback);
 }

@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ParkingReport, formatDateLabel } from '../types/parking';
 import { computeDayStreak } from '../utils/streak';
+import { canUseFirestore } from '../config/firebase';
+import { createReport, ensureAuth } from '../services/reportService';
 
 const REPORTS_KEY = '@parkly:reports';
 const PENDING_KEY = '@parkly:pending_reports';
@@ -111,8 +113,10 @@ class ReportStoreClass {
   }
 
   private get myReports(): ParkingReport[] {
-    if (!this.currentUserId) return this.reports;
-    return this.reports.filter((r) => r.userId === this.currentUserId);
+    if (!this.currentUserId) return [];
+    return this.reports.filter(
+      (r) => r.userId === this.currentUserId || r.userId === undefined
+    );
   }
 
   private emit(): void {
@@ -123,7 +127,9 @@ class ReportStoreClass {
     if (this.saveTimeout) clearTimeout(this.saveTimeout);
     this.saveTimeout = setTimeout(() => {
       this.saveTimeout = null;
-      saveReports(this.reports).catch(() => {});
+      saveReports(this.reports).catch((e) => {
+        if (typeof __DEV__ !== 'undefined' && __DEV__) console.warn('[ReportStore] saveReports failed:', e);
+      });
     }, SAVE_DEBOUNCE_MS);
   }
 
@@ -193,8 +199,6 @@ class ReportStoreClass {
     this.emit();
 
     try {
-      const { createReport, ensureAuth } = await import('../services/reportService');
-      const { canUseFirestore } = await import('../config/firebase');
       if (!canUseFirestore()) throw new Error('Firebase not configured');
       const uid = await ensureAuth();
       this.setCurrentUserId(uid);

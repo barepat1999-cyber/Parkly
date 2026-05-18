@@ -50,20 +50,28 @@ export function ReportStoreProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     let cancelled = false;
-    ReportStore.load().then(async () => {
-      if (cancelled) return;
-      setReports(ReportStore.getReports());
-      setIsReady(true);
+    ReportStore.load()
+      .then(async () => {
+        if (cancelled) return;
+        setReports(ReportStore.getReports());
+        setIsReady(true);
 
-      if (canUseFirestore()) {
-        try {
-          const uid = await ensureAuth();
-          ReportStore.setCurrentUserId(uid);
-        } catch (e) {
-          if (__DEV__) console.warn('[ReportStore] ensureAuth failed:', e);
+        if (canUseFirestore()) {
+          try {
+            const uid = await ensureAuth();
+            ReportStore.setCurrentUserId(uid);
+          } catch (e) {
+            if (__DEV__) console.debug('[ReportStore] ensureAuth failed:', e);
+          }
         }
-      }
-    });
+      })
+      .catch((e) => {
+        if (__DEV__) console.warn('[ReportStore] load failed:', e);
+        if (!cancelled) {
+          setReports([]);
+          setIsReady(true);
+        }
+      });
     const unsub = ReportStore.subscribe(() => {
       if (!cancelled) setReports(ReportStore.getReports());
     });
@@ -77,8 +85,12 @@ export function ReportStoreProvider({ children }: { children: React.ReactNode })
     if (!canUseFirestore()) return;
     const unsub = subscribeReports(
       (firestoreReports) => {
-        const parkingReports = firestoreReports.map(toParkingReport);
-        ReportStore.setReportsRemote(parkingReports);
+        try {
+          const parkingReports = firestoreReports.map(toParkingReport);
+          ReportStore.setReportsRemote(parkingReports);
+        } catch (e) {
+          if (__DEV__) console.debug('[ReportStore] subscribeReports callback failed:', e);
+        }
       },
       { sinceMinutes: SYNC_SINCE_MINUTES }
     );
@@ -100,6 +112,9 @@ export function ReportStoreProvider({ children }: { children: React.ReactNode })
 
   const filteredReports = filterReportsByTime(reports, timeFilter);
   const reportsByDay = reportsGroupedByDayFromReports(filteredReports);
+  const myReports = ReportStore.getReportsForProfile();
+  const myFilteredReports = filterReportsByTime(myReports, timeFilter);
+  const myReportsByDay = reportsGroupedByDayFromReports(myFilteredReports);
   const value: ReportStoreContextValue = {
     reports,
     filteredReports,
@@ -108,7 +123,7 @@ export function ReportStoreProvider({ children }: { children: React.ReactNode })
     totalReports: ReportStore.totalReports,
     dayStreak: ReportStore.dayStreak,
     reportsGroupedByDay: reportsByDay,
-    reportsByDay,
+    reportsByDay: myReportsByDay,
     addReport,
     removeReport,
     clearAll,

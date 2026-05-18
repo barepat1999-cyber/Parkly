@@ -1,47 +1,142 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   RefreshControl,
-  TouchableOpacity,
-  Modal,
-  Pressable,
+  ActivityIndicator,
 } from 'react-native';
-import { useReportStore } from '../../src/store/ReportStoreContext';
-import type { TimeFilterValue } from '../../src/store/ReportStoreContext';
-import { ParkingReport, formatTime, formatDateLabel } from '../../src/types/parking';
+import { useFocusEffect } from 'expo-router';
+import * as Location from 'expo-location';
+import { getCurrentLocation, isValidCoordinate } from '../../src/utils/location';
+import {
+  subscribeUserReports,
+  ensureAuth,
+  toParkingReport,
+} from '../../src/services/reportService';
+import { canUseFirestore } from '../../src/config/firebase';
+import { distanceMeters, formatDistance } from '../../src/utils/geo';
 
-const FILTER_OPTIONS: { value: TimeFilterValue; label: string }[] = [
-  { value: '15', label: '15 min' },
-  { value: '30', label: '30 min' },
-  { value: '60', label: '60 min' },
-  { value: 'all', label: 'All' },
-];
-
-function getStatusColor(status: ParkingReport['status']): string {
-  return status === 'available' ? '#4CAF50' : '#F44336';
+function formatMinutesAgo(ts: number, now: number): string {
+  const min = Math.floor((now - ts) / 60000);
+  if (min < 1) return 'just now';
+  if (min === 1) return '1 min ago';
+  if (min < 60) return `${min} min ago`;
+  const h = Math.floor(min / 60);
+  if (h === 1) return '1 hour ago';
+  return `${h} hours ago`;
 }
 
-function getStatusText(status: ParkingReport['status']): string {
-  return status === 'available' ? 'Ledig' : 'Optaget';
-}
-
-function roundCoord(n: number): number {
-  return Math.round(n * 10000) / 10000;
-}
+type HistoryReport = {
+  id: string;
+  latitude: number;
+  longitude: number;
+  status: 'available' | 'occupied';
+  createdAt: number;
+};
 
 export default function HistoryScreen() {
-  const { reportsByDay, isReady, timeFilter, setTimeFilter } = useReportStore();
+  const [reports, setReports] = useState<HistoryReport[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [streetNames, setStreetNames] = useState<Record<string, string>>({});
 
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    await new Promise((r) => setTimeout(r, 300));
-    setRefreshing(false);
+  const loadUserReports = useCallback(() => {
+    if (!canUseFirestore()) {
+      setReports([]);
+      setLoading(false);
+      return () => {};
+    }
+    let unsub: (() => void) | null = null;
+    ensureAuth()
+      .then((uid) => {
+        unsub = subscribeUserReports(uid, (firestoreReports) => {
+          const list = firestoreReports.map((r) => {
+            const p = toParkingReport(r);
+            return {
+              id: p.id,
+              latitude: p.latitude,
+              longitude: p.longitude,
+              status: p.status,
+              createdAt: p.createdAt,
+            };
+          });
+          setReports(list);
+          setLoading(false);
+        }, { limitCount: 20 });
+      })
+      .catch((e) => {
+        if (__DEV__) console.warn('[History] ensureAuth/subscribe failed:', e);
+        setReports([]);
+        setLoading(false);
+      });
+    return () => {
+      unsub?.();
+    };
   }, []);
+
+  useEffect(() => {
+    const cleanup = loadUserReports();
+    return cleanup;
+  }, [loadUserReports]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUserReports();
+    }, [loadUserReports])
+  );
+
+  useEffect(() => {
+    getCurrentLocation({ silent: true })
+      .then((loc) => {
+        if (loc && isValidCoordinate(loc.latitude, loc.longitude)) {
+          setUserLocation({ latitude: loc.latitude, longitude: loc.longitude });
+        }
+      })
+      .catch((e) => {
+        if (__DEV__) console.warn('[History] getCurrentLocation failed:', e);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (reports.length === 0) return;
+    reports.slice(0, 5).forEach((r) => {
+      Location.reverseGeocodeAsync({
+        latitude: r.latitude,
+        longitude: r.longitude,
+      })
+        .then((results) => {
+          if (results.length > 0) {
+            const addr = results[0];
+            const street = addr?.street ?? addr?.name ?? addr?.streetNumber;
+            if (street) {
+              setStreetNames((prev) => ({ ...prev, [r.id]: street }));
+            }
+          }
+        })
+        .catch((e) => {
+          if (__DEV__) console.warn('[History] reverseGeocode failed:', e);
+        });
+    });
+  }, [reports]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setStreetNames({});
+    loadUserReports();
+    try {
+      await new Promise((r) => setTimeout(r, 400));
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadUserReports]);
+
+  const now = Date.now();
 
   return (
     <ScrollView
@@ -50,165 +145,85 @@ export default function HistoryScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      <View style={styles.filterRow}>
-        <TouchableOpacity style={styles.filterChip} onPress={() => setFilterModalVisible(true)}>
-          <Text style={styles.filterChipText}>
-            {FILTER_OPTIONS.find((o) => o.value === timeFilter)?.label ?? 'Filter'}
-          </Text>
-        </TouchableOpacity>
-      </View>
       <View style={styles.section}>
-        {!isReady || reportsByDay.length === 0 ? (
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color="#2196F3" />
+          </View>
+        ) : reports.length === 0 ? (
           <Text style={styles.emptyText}>No reports yet</Text>
         ) : (
-          reportsByDay.map((group) => (
-            <View key={group.dateKey} style={styles.dayGroup}>
-              <Text style={styles.dayLabel}>{group.label}</Text>
-              {group.reports.map((report) => (
-                <View key={report.id} style={styles.reportItem}>
-                  <View style={styles.reportHeader}>
-                    <View style={styles.reportTitleBlock}>
-                      <Text style={styles.reportTitle}>Spot</Text>
-                      <Text style={styles.reportCoords}>
-                        {roundCoord(report.latitude)}, {roundCoord(report.longitude)}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: getStatusColor(report.status) },
-                      ]}
-                    >
-                      <Text style={styles.statusBadgeText}>
-                        {getStatusText(report.status)}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.reportTime}>
-                    {formatDateLabel(report.createdAt)} {formatTime(report.createdAt)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ))
+          reports.map((report) => {
+            const distance =
+              userLocation != null
+                ? distanceMeters(
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    report.latitude,
+                    report.longitude
+                  )
+                : null;
+            return (
+              <View key={report.id} style={styles.card}>
+                <Text style={styles.cardTitle}>
+                  {report.status === 'available' ? 'Free spot' : 'Taken spot'}
+                </Text>
+                <Text style={styles.cardSubtitle}>
+                  {streetNames[report.id] ??
+                    (distance != null ? formatDistance(distance) : '—')}
+                </Text>
+                <Text style={styles.cardTime}>
+                  {formatMinutesAgo(report.createdAt, now)}
+                </Text>
+              </View>
+            );
+          })
         )}
       </View>
-
-      <Modal
-        visible={filterModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setFilterModalVisible(false)}
-      >
-        <Pressable style={styles.filterOverlay} onPress={() => setFilterModalVisible(false)}>
-          <View style={styles.filterDropdown}>
-            {FILTER_OPTIONS.map((opt) => (
-              <TouchableOpacity
-                key={opt.value}
-                style={[styles.filterOption, timeFilter === opt.value && styles.filterOptionActive]}
-                onPress={() => {
-                  setTimeFilter(opt.value);
-                  setFilterModalVisible(false);
-                }}
-              >
-                <Text style={styles.filterOptionText}>{opt.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  filterRow: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
-  filterChip: {
-    backgroundColor: '#fff',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  filterChipText: { fontSize: 14, fontWeight: '600', color: '#333' },
-  filterOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'flex-start',
-    paddingTop: 100,
-    paddingLeft: 16,
-    alignItems: 'flex-start',
-  },
-  filterDropdown: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    minWidth: 120,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  filterOption: { paddingVertical: 12, paddingHorizontal: 16 },
-  filterOptionActive: { backgroundColor: '#E3F2FD' },
-  filterOptionText: { fontSize: 15, color: '#333' },
   section: {
-    backgroundColor: '#fff',
     margin: 16,
-    marginTop: 8,
-    padding: 16,
-    borderRadius: 8,
+    marginTop: 16,
+  },
+  loadingWrap: {
+    paddingVertical: 40,
+    alignItems: 'center',
   },
   emptyText: {
     color: '#999',
     fontStyle: 'italic',
-    paddingVertical: 8,
+    paddingVertical: 24,
+    fontSize: 15,
   },
-  dayGroup: {
-    marginBottom: 20,
+  card: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  dayLabel: {
+  cardTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#333',
-    marginBottom: 8,
-  },
-  reportItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  reportHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 4,
   },
-  reportTitleBlock: { flex: 1 },
-  reportTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  reportCoords: {
-    fontSize: 12,
+  cardSubtitle: {
+    fontSize: 14,
     color: '#666',
-    marginTop: 2,
+    marginBottom: 2,
   },
-  reportTime: {
+  cardTime: {
     fontSize: 12,
     color: '#999',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  statusBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
   },
 });

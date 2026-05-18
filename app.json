@@ -8,9 +8,9 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/icon.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#14B8A6"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -18,6 +18,15 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.parkly.app",
+      "infoPlist": {
+        "NSUserNotificationsUsageDescription": "Parkly sender lokale beskeder, når du parkerer eller forlader en plads."
+      },
+      "icon": "./assets/icon.png",
+      "splash": {
+        "image": "./assets/icon.png",
+        "resizeMode": "cover",
+        "backgroundColor": "#14B8A6"
+      },
       "config": {
         "googleMapsApiKey": "${GOOGLE_MAPS_API_KEY}"
       }
@@ -41,9 +50,23 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Parkly har brug for din lokation for at vise parkeringspladser i nærheden."
+          "locationAlwaysAndWhenInUsePermission": "Parkly bruger din lokation til kort, parkeringsdetektion og påmindelser. Vælg \"Altid\" for at det virker, når appen er i baggrunden.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isIosBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#14B8A6",
+          "sounds": []
         }
       ]
-    ]
+    ],
+    "notification": {
+      "icon": "./assets/icon.png",
+      "color": "#14B8A6"
+    }
   }
 }

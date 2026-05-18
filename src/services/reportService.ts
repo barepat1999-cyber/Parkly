@@ -79,6 +79,43 @@ function docToReport(docId: string, data: Record<string, unknown>): FirestoreRep
   };
 }
 
+/** Subscribe to current user's reports. Returns unsubscribe function. */
+export function subscribeUserReports(
+  userId: string,
+  onUpdate: (reports: FirestoreReport[]) => void,
+  options?: { limitCount?: number }
+): () => void {
+  if (!db || !canUseFirestore()) {
+    onUpdate([]);
+    return () => {};
+  }
+
+  const limitCount = options?.limitCount ?? 20;
+
+  const q = query(
+    collection(db, 'reports'),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc'),
+    limit(limitCount)
+  );
+
+  const unsub = onSnapshot(
+    q,
+    (snapshot) => {
+      const reports: FirestoreReport[] = snapshot.docs.map((doc) =>
+        docToReport(doc.id, doc.data())
+      );
+      onUpdate(reports);
+    },
+    (err) => {
+      if (__DEV__) console.debug('[reportService] subscribeUserReports error:', err);
+      onUpdate([]);
+    }
+  );
+
+  return () => unsub();
+}
+
 /** Subscribe to reports in real-time. Returns unsubscribe function. */
 export function subscribeReports(
   onUpdate: (reports: FirestoreReport[]) => void,
@@ -108,7 +145,7 @@ export function subscribeReports(
       onUpdate(reports);
     },
     (err) => {
-      if (__DEV__) console.warn('[reportService] onSnapshot error:', err);
+      if (__DEV__) console.debug('[reportService] onSnapshot error:', err);
       onUpdate([]);
     }
   );
